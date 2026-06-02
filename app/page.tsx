@@ -23,7 +23,6 @@ import {
   LogOut,
   MailCheck,
   Save,
-  Search,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -31,8 +30,9 @@ import {
   Users
 } from "lucide-react";
 
-import { api, CategoryOptions, clearToken, DashboardSummary, Employee, getToken, Review } from "@/lib/api";
+import { api, CategoryOptions, clearToken, DashboardSummary, Employee, getToken } from "@/lib/api";
 import { EmployeeAdmin, EmployeeFormState, EmployeeUpdatePayload } from "@/components/EmployeeAdmin";
+import { RecordsPanel } from "@/components/RecordsPanel";
 
 type View = "dashboard" | "upload" | "analysis" | "records" | "settings" | "employees";
 type AnalysisForm = {
@@ -44,14 +44,6 @@ type AnalysisForm = {
   sentimiento: string;
   producto: string;
   detalle: string;
-};
-type FilterState = {
-  category: string;
-  subcategory: string;
-  sentiment: string;
-  product: string;
-  classification: string;
-  search: string;
 };
 type PredictionResult = {
   predicted_classification: string;
@@ -75,7 +67,8 @@ const emptyOptions: CategoryOptions = {
   subcategories: [],
   sentiments: [],
   products: [],
-  classifications: []
+  classifications: [],
+  employees: []
 };
 
 const palette = ["#1558a8", "#1d6ed0", "#38a3d1", "#42b883", "#f59e0b", "#64748b"];
@@ -85,19 +78,9 @@ export default function Home() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [summary, setSummary] = useState<DashboardSummary>(emptySummary);
   const [options, setOptions] = useState<CategoryOptions>(emptyOptions);
-  const [reviews, setReviews] = useState<Review[]>([]);
   const [employeeList, setEmployeeList] = useState<Employee[]>([]);
-  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
-  const [filters, setFilters] = useState<FilterState>({
-    category: "",
-    subcategory: "",
-    sentiment: "",
-    product: "",
-    classification: "",
-    search: ""
-  });
   const [analysisForm, setAnalysisForm] = useState<AnalysisForm>({
     customer_id: "",
     customer_name: "",
@@ -122,14 +105,6 @@ export default function Home() {
     setOptions(categoryData);
   };
 
-  const loadReviews = async () => {
-    const query = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) query.set(key, value);
-    });
-    setReviews(await api.reviews(query.toString() ? `?${query.toString()}` : ""));
-  };
-
   const loadEmployees = async () => {
     setEmployeeList(await api.employees());
   };
@@ -152,9 +127,6 @@ export default function Home() {
   }, [router]);
 
   useEffect(() => {
-    if (view === "records" && employee) {
-      loadReviews().catch((error) => setStatus(error.message));
-    }
     if (view === "employees" && employee?.role === "admin") {
       loadEmployees().catch((error) => setStatus(error.message));
     }
@@ -202,18 +174,6 @@ export default function Home() {
       await loadSummary();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "No se pudo generar la prediccion.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = async (event: FormEvent) => {
-    event.preventDefault();
-    setLoading(true);
-    try {
-      await loadReviews();
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "No se pudieron cargar registros.");
     } finally {
       setLoading(false);
     }
@@ -332,18 +292,7 @@ export default function Home() {
             onSubmit={handlePredict}
           />
         )}
-        {view === "records" && (
-          <RecordsPanel
-            filters={filters}
-            loading={loading}
-            options={options}
-            reviews={reviews}
-            selectedReview={selectedReview}
-            setFilters={setFilters}
-            setSelectedReview={setSelectedReview}
-            onSubmit={applyFilters}
-          />
-        )}
+        {view === "records" && <RecordsPanel options={options} />}
         {view === "settings" && (
           <SettingsPanel
             employee={employee}
@@ -506,83 +455,6 @@ function Field({ label, options, value, onChange }: { label: string; options: st
   );
 }
 
-function RecordsPanel({
-  filters,
-  loading,
-  options,
-  reviews,
-  selectedReview,
-  setFilters,
-  setSelectedReview,
-  onSubmit
-}: {
-  filters: FilterState;
-  loading: boolean;
-  options: CategoryOptions;
-  reviews: Review[];
-  selectedReview: Review | null;
-  setFilters: (value: FilterState) => void;
-  setSelectedReview: (review: Review | null) => void;
-  onSubmit: (event: FormEvent) => void;
-}) {
-  const update = (key: keyof FilterState, value: string) => setFilters({ ...filters, [key]: value });
-  return (
-    <section className="card">
-      <form className="filters" onSubmit={onSubmit}>
-        <SelectFilter label="Categoria" options={options.categories} value={filters.category} onChange={(value) => update("category", value)} />
-        <SelectFilter label="Subcategoria" options={options.subcategories} value={filters.subcategory} onChange={(value) => update("subcategory", value)} />
-        <SelectFilter label="Sentimiento" options={options.sentiments} value={filters.sentiment} onChange={(value) => update("sentiment", value)} />
-        <SelectFilter label="Producto" options={options.products} value={filters.product} onChange={(value) => update("product", value)} />
-        <SelectFilter label="Clasificacion" options={options.classifications} value={filters.classification} onChange={(value) => update("classification", value)} />
-        <label>Buscar<input value={filters.search} onChange={(event) => update("search", event.target.value)} /></label>
-        <button className="button" disabled={loading} type="submit"><Search size={18} />Filtrar</button>
-      </form>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Comentario</th>
-              <th>Categoria</th>
-              <th>Subcategoria</th>
-              <th>Clasificacion</th>
-              <th>Probabilidad</th>
-              <th>Empleado</th>
-              <th>Alerta</th>
-              <th>Fecha</th>
-              <th>Detalle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reviews.map((review) => (
-              <tr key={review.id}>
-                <td>{review.external_id || review.id}</td>
-                <td>{review.comment}</td>
-                <td>{review.category}</td>
-                <td>{review.subcategory}</td>
-                <td><span className="pill">{review.predicted_classification || "N/D"}</span></td>
-                <td>{review.prediction_confidence === null ? "N/D" : `${Math.round(review.prediction_confidence * 100)}%`}</td>
-                <td>{review.employee_name || "N/D"}</td>
-                <td>{review.alert_sent ? "Enviada" : "No enviada"}</td>
-                <td>{new Date(review.created_at).toLocaleDateString("es-MX")}</td>
-                <td><button className="button secondary" onClick={() => setSelectedReview(review)} type="button">Ver</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {selectedReview && (
-        <div className="card detail-panel">
-          <p className="card-title">Detalle del comentario</p>
-          <p>{selectedReview.comment}</p>
-          <p className="muted">{selectedReview.detail || "Sin detalle adicional"}</p>
-          <button className="button secondary" onClick={() => setSelectedReview(null)} type="button">Cerrar</button>
-        </div>
-      )}
-    </section>
-  );
-}
-
 function SettingsPanel({
   employee,
   form,
@@ -643,17 +515,5 @@ function SettingsPanel({
         {status && <p className="status error full">{status}</p>}
       </form>
     </section>
-  );
-}
-
-function SelectFilter({ label, options, value, onChange }: { label: string; options: string[]; value: string; onChange: (value: string) => void }) {
-  return (
-    <label>
-      {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Todos</option>
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
-    </label>
   );
 }

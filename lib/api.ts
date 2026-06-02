@@ -1,6 +1,6 @@
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://machine-backend-production.up.railway.app";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+//"https://machine-backend-production.up.railway.app";
 
 export const TOKEN_KEY = "element_elite_fleet_token";
 
@@ -50,9 +50,24 @@ export type Review = {
   prediction_confidence: number | null;
   employee_id: number | null;
   employee_name: string | null;
+  employee_email: string | null;
   alert_sent: boolean;
   alert_sent_at: string | null;
   created_at: string;
+};
+
+export type ReviewsResponse = {
+  items: Review[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  metrics: {
+    total: number;
+    abandonment: number;
+    retention: number;
+    alerts_sent: number;
+  };
 };
 
 export type Employee = {
@@ -69,6 +84,7 @@ export type CategoryOptions = {
   sentiments: string[];
   products: string[];
   classifications: string[];
+  employees?: { id: number; name: string }[];
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -140,7 +156,7 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   summary: () => request<DashboardSummary>("/dashboard-summary"),
-  reviews: (query = "") => request<Review[]>(`/reviews${query}`),
+  reviews: (query = "") => request<ReviewsResponse>(`/reviews${query}`),
   categories: () => request<CategoryOptions>("/categories"),
   predict: (payload: Record<string, string>) =>
     request<{
