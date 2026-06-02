@@ -1,6 +1,7 @@
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-//"https://machine-backend-production.up.railway.app";
+  process.env.NEXT_PUBLIC_API_URL ||
+  //"http://localhost:8000";
+  "https://machine-backend-production.up.railway.app";
 
 export const TOKEN_KEY = "element_elite_fleet_token";
 
